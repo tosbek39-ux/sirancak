@@ -25,7 +25,12 @@ export function Logo({ className, logoUrl, useText = false, isLogin = false }: {
         backgroundClass
         )}>
         {logoUrl ? (
-          <Image src={logoUrl} alt="Logo" width={logoImageSize} height={logoImageSize} className="object-contain" />
+          /* Check if logoUrl is a local path or a remote URL */
+          logoUrl.startsWith('/') ? (
+            <Image src={logoUrl} alt="Logo" width={logoImageSize} height={logoImageSize} className="object-contain" unoptimized={true} />
+          ) : (
+            <Image src={logoUrl} alt="Logo" width={logoImageSize} height={logoImageSize} className="object-contain" />
+          )
         ) : (
           <CalendarCheck className={cn("text-slate-800 dark:text-white", logoIconSizeClass)} />
         )}

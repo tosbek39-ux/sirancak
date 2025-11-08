@@ -99,7 +99,8 @@ export default function DashboardPage() {
         getLeaveRequests(),
         getUsers(),
       ]);
-      setLeaveRequests(fetchedRequests);
+      // Ensure fetchedRequests is an array before setting state
+      setLeaveRequests(fetchedRequests || []);
       setUsers(fetchedUsers);
     } catch (error) {
       console.error("Failed to fetch initial data:", error);
@@ -123,13 +124,13 @@ export default function DashboardPage() {
 
   const availableYears = useMemo(() => {
     const years = new Set(
-      leaveRequests.map((req) => format(req.createdAt, "yyyy"))
+      (leaveRequests || []).map((req) => format(req.createdAt, "yyyy"))
     );
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [leaveRequests]);
 
   const filteredRequests = useMemo(() => {
-    return leaveRequests
+    return (leaveRequests || [])
       .filter((request) => {
         if (selectedYear === "all") return true;
         return format(request.createdAt, "yyyy") === selectedYear;

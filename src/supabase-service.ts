@@ -1,4 +1,4 @@
-import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabase'
+import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './lib/supabaseClient'
 import type { User, Department, LeaveType, LeaveRequest, Notification, LogEntry } from '@/types'
 
 // Users service
@@ -152,24 +152,83 @@ export const departmentsService = {
     })) || []
   },
 
-  // Get department by ID
+    // Get department by ID
   async getById(id: string): Promise<Department | null> {
     const { data, error } = await supabase
       .from('departments')
       .select('*')
       .eq('id', id)
       .single()
-
     if (error) {
       console.error('Error fetching department:', error)
       return null
     }
-
     return data ? {
       id: data.id,
       name: data.name,
       employeeCount: data.employee_count
     } : null
+  },
+
+  // Create new department
+  async create(department: { name: string }): Promise<Department> {
+    const newId = department.name.toLowerCase().replace(/\s/g, '-');
+    const { data, error } = await supabase
+      .from('departments')
+      .insert({ name: department.name, id: newId, employee_count: 0 })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating department:', error)
+      throw error
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      employeeCount: data.employee_count
+    }
+  },
+
+  // Update department
+  async update(id: string, updates: Partial<Department>): Promise<Department> {
+    const updateData: any = {}
+    if (updates.name) updateData.name = updates.name
+    if (updates.employeeCount !== undefined) updateData.employee_count = updates.employeeCount
+
+    const { data, error } = await supabase
+      .from('departments')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating department:', error)
+      throw error
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      employeeCount: data.employee_count
+    }
+  },
+
+  // Delete department
+  async delete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('departments')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting department:', error)
+      throw error
+    }
+
+    return true
   }
 }
 

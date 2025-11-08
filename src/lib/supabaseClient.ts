@@ -64,7 +64,7 @@ export type Database = {
           annual_leave_balance?: number
           qr_code_signature?: string | null
           phone?: string | null
-          bangsa?: string | null
+          golongan?: string | null
           join_date?: string | null
           address?: string | null
           password?: string | null
@@ -251,7 +251,7 @@ export const convertUserToDb = (appUser: any) => {
     annual_leave_balance: appUser.annualLeaveBalance,
     qr_code_signature: appUser.qrCodeSignature,
     phone: appUser.phone,
-    bangsa: appUser.golongan,
+    golongan: appUser.golongan,
     join_date: appUser.joinDate?.toISOString(),
     address: appUser.address,
     password: appUser.password,

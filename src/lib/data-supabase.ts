@@ -10,6 +10,7 @@ import {
   logEntriesService,
   appSettingsService
 } from './supabase-service'
+import { supabase } from './supabaseClient'
 
 // ==============================
 // 🔹 DATA CACHE

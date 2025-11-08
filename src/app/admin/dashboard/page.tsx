@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -22,21 +23,21 @@ import {
   CheckCircle,
   XCircle,
   MoreHorizontal,
-  FileWarning,
   Ban,
   PauseCircle,
 } from "lucide-react";
 import {
-  getDepartmentById,
-  getLeaveTypeById,
-  getUserById,
-  getLeaveRequests, // Import the async function
-  getUsers, // Import the async function
+  getLeaveRequests,
+  getUsers,
+  getDepartments,
+  getLeaveTypes,
   logHistory,
+  updateLeaveRequest,
+  updateUser
 } from "@/lib/data-supabase";
 import { format } from "date-fns";
 import { useState, useMemo, useEffect } from "react";
-import type { LeaveRequest, User } from "@/types";
+import type { LeaveRequest, User, Department, LeaveType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -78,15 +79,31 @@ const statusIcons: Record<string, React.ReactNode> = {
   Suspended: <PauseCircle className="h-4 w-4" />,
 };
 
+// Loading skeleton component
+const DashboardSkeleton = () => (
+    <div className="flex flex-col gap-6 animate-pulse">
+        <div className="grid gap-4 md:grid-cols-3">
+            <Card><CardHeader><div className="h-6 bg-gray-300 rounded w-1/2"></div></CardHeader><CardContent><div className="h-8 bg-gray-300 rounded w-1/4"></div></CardContent></Card>
+            <Card><CardHeader><div className="h-6 bg-gray-300 rounded w-1/2"></div></CardHeader><CardContent><div className="h-8 bg-gray-300 rounded w-1/4"></div></CardContent></Card>
+            <Card><CardHeader><div className="h-6 bg-gray-300 rounded w-1/2"></div></CardHeader><CardContent><div className="h-8 bg-gray-300 rounded w-1/4"></div></CardContent></Card>
+        </div>
+        <Card>
+            <CardHeader><div className="h-8 bg-gray-300 rounded w-1/3"></div></CardHeader>
+            <CardContent><div className="h-40 bg-gray-300 rounded"></div></CardContent>
+        </Card>
+    </div>
+);
+
 export default function DashboardPage() {
   const { toast } = useToast();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
 
-  const [requestToCancel, setRequestToCancel] = useState<LeaveRequest | null>(
-    null
-  );
+  const [requestToCancel, setRequestToCancel] = useState<LeaveRequest | null>(null);
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
   const [password, setPassword] = useState("");
 
@@ -95,16 +112,21 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [fetchedRequests, fetchedUsers] = await Promise.all([
+      const [fetchedRequests, fetchedUsers, fetchedDepartments, fetchedLeaveTypes] = await Promise.all([
         getLeaveRequests(),
         getUsers(),
+        getDepartments(),
+        getLeaveTypes(),
       ]);
-      // Ensure fetchedRequests is an array before setting state
       setLeaveRequests(fetchedRequests || []);
-      setUsers(fetchedUsers);
+      setUsers(fetchedUsers || []);
+      setDepartments(fetchedDepartments || []);
+      setLeaveTypes(fetchedLeaveTypes || []);
     } catch (error) {
       console.error("Failed to fetch initial data:", error);
-      // Optionally show a toast error here
+      toast({ variant: "destructive", title: "Error", description: "Failed to load data from the server." });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -115,17 +137,16 @@ export default function DashboardPage() {
   }, []);
 
   const stats = useMemo(() => {
+    const requests = leaveRequests || [];
     return {
-      pending: leaveRequests.filter((r) => r.status === "Pending").length,
-      approved: leaveRequests.filter((r) => r.status === "Approved").length,
-      total: leaveRequests.length,
+      pending: requests.filter((r) => r.status === "Pending").length,
+      approved: requests.filter((r) => r.status === "Approved").length,
+      total: requests.length,
     };
   }, [leaveRequests]);
 
   const availableYears = useMemo(() => {
-    const years = new Set(
-      (leaveRequests || []).map((req) => format(req.createdAt, "yyyy"))
-    );
+    const years = new Set((leaveRequests || []).map((req) => format(new Date(req.createdAt), "yyyy")));
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [leaveRequests]);
 
@@ -133,13 +154,13 @@ export default function DashboardPage() {
     return (leaveRequests || [])
       .filter((request) => {
         if (selectedYear === "all") return true;
-        return format(request.createdAt, "yyyy") === selectedYear;
+        return format(new Date(request.createdAt), "yyyy") === selectedYear;
       })
       .filter((request) => {
         if (!searchTerm) return true;
-        const user = getUserById(request.userId);
-        const department = user ? getDepartmentById(user.departmentId) : null;
-        const leaveType = getLeaveTypeById(request.leaveTypeId);
+        const user = (users || []).find(u => u.id === request.userId);
+        const department = user ? (departments || []).find(d => d.id === user.departmentId) : null;
+        const leaveType = (leaveTypes || []).find(lt => lt.id === request.leaveTypeId);
         const lowerCaseSearch = searchTerm.toLowerCase();
         return (
           user?.name.toLowerCase().includes(lowerCaseSearch) ||
@@ -147,7 +168,7 @@ export default function DashboardPage() {
           leaveType?.name.toLowerCase().includes(lowerCaseSearch)
         );
       });
-  }, [leaveRequests, searchTerm, selectedYear]);
+  }, [leaveRequests, searchTerm, selectedYear, users, departments, leaveTypes]);
 
   const handleCancelClick = (request: LeaveRequest) => {
     setRequestToCancel(request);
@@ -158,41 +179,36 @@ export default function DashboardPage() {
     }
   };
 
-  const performCancellation = (request: LeaveRequest) => {
-    const userToUpdate = users.find((u) => u.id === request.userId);
+  const performCancellation = async (request: LeaveRequest) => {
+    const userToUpdate = (users || []).find((u) => u.id === request.userId);
     if (!userToUpdate) return;
 
-    const adminUser = users.find((u) => u.role === "Admin");
+    const adminUser = (users || []).find((u) => u.role === "Admin");
+    const leaveType = (leaveTypes || []).find(lt => lt.id === request.leaveTypeId);
 
-    const updatedRequests = leaveRequests.map((r) =>
-      r.id === request.id ? { ...r, status: "Cancelled" as const } : r
-    );
-    setLeaveRequests(updatedRequests);
+    try {
+        await updateLeaveRequest(request.id, { status: "Cancelled" });
 
-    const leaveType = getLeaveTypeById(request.leaveTypeId);
-    if (
-      leaveType?.name === "Cuti Tahunan" &&
-      (request.status === "Approved" || request.status === "Suspended")
-    ) {
-      const updatedUsers = users.map((u) =>
-        u.id === userToUpdate.id
-          ? { ...u, annualLeaveBalance: u.annualLeaveBalance + request.days }
-          : u
-      );
-      setUsers(updatedUsers);
+        if (leaveType?.name === "Cuti Tahunan" && (request.status === "Approved" || request.status === "Suspended")) {
+            const newBalance = (userToUpdate.annualLeaveBalance || 0) + request.days;
+            await updateUser(userToUpdate.id, { annualLeaveBalance: newBalance });
+        }
+
+        if (adminUser) {
+            await logHistory({
+                id: `log-${Date.now()}`,
+                date: new Date(),
+                user: adminUser.name,
+                activity: `Cancelled leave request for ${userToUpdate.name} (${leaveType?.name}, ${request.days} days).`,
+            });
+        }
+
+        toast({ title: "Leave Request Cancelled", description: `The request from ${userToUpdate.name} has been cancelled.` });
+        fetchData(); // Refresh data
+    } catch (error) {
+        console.error("Failed to cancel request:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to cancel the request." });
     }
-
-    logHistory.unshift({
-      id: `log-${Date.now()}`,
-      date: new Date(),
-      user: adminUser?.name || "Admin",
-      activity: `Cancelled leave request for ${userToUpdate.name} (${leaveType?.name}, ${request.days} days).`,
-    });
-
-    toast({
-      title: "Leave Request Cancelled",
-      description: `The request from ${userToUpdate.name} has been cancelled.`,
-    });
 
     setIsCancelAlertOpen(false);
     setPassword("");
@@ -200,17 +216,17 @@ export default function DashboardPage() {
   };
 
   const handleConfirmCancel = () => {
-    const adminUser = users.find((u) => u.role === "Admin");
+    const adminUser = (users || []).find((u) => u.role === "Admin");
     if (password !== adminUser?.password) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Failed",
-        description: "Incorrect password. Cancellation aborted.",
-      });
+      toast({ variant: "destructive", title: "Authentication Failed", description: "Incorrect password. Cancellation aborted." });
       return;
     }
     if (requestToCancel) performCancellation(requestToCancel);
   };
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <>
@@ -223,14 +239,10 @@ export default function DashboardPage() {
           ].map((stat) => (
             <Card key={stat.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.title}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
                 {stat.icon}
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-              </CardContent>
+              <CardContent><div className="text-2xl font-bold">{stat.value}</div></CardContent>
             </Card>
           ))}
         </div>
@@ -240,9 +252,7 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <CardTitle>Recent Leave Requests</CardTitle>
-                <CardDescription>
-                  An overview of the latest leave requests from all departments.
-                </CardDescription>
+                <CardDescription>An overview of the latest leave requests from all departments.</CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <Input
@@ -252,16 +262,10 @@ export default function DashboardPage() {
                   className="w-full sm:w-[250px]"
                 />
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="w-full sm:w-[120px]">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Years</SelectItem>
-                    {availableYears.map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
-                    ))}
+                    {availableYears.map((year) => (<SelectItem key={year} value={year}>{year}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -282,52 +286,50 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRequests.map((req) => {
-                  const user = getUserById(req.userId);
-                  const leaveType = getLeaveTypeById(req.leaveTypeId);
-                  const dept = user ? getDepartmentById(user.departmentId) : null;
-                  if (!user || !leaveType) return null;
+                {filteredRequests.length > 0 ? (
+                  filteredRequests.map((req) => {
+                    const user = (users || []).find(u => u.id === req.userId);
+                    const leaveType = (leaveTypes || []).find(lt => lt.id === req.leaveTypeId);
+                    const dept = user ? (departments || []).find(d => d.id === user.departmentId) : null;
+                    
+                    if (!user || !leaveType || !dept) return null; // Skip rendering if essential data is missing
 
-                  return (
-                    <TableRow key={req.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarImage src={user.avatar} alt={user.name} />
-                            <AvatarFallback>{user.name[0]}</AvatarFallback>
-                          </Avatar>
-                          <span>{user.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{dept?.name}</TableCell>
-                      <TableCell>{leaveType.name}</TableCell>
-                      <TableCell>
-                        {format(req.startDate, "MMM d, y")} -{" "}
-                        {format(req.endDate, "MMM d, y")}
-                      </TableCell>
-                      <TableCell>{req.days}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={statusColors[req.status]}
-                          className="flex items-center gap-1 w-fit"
-                        >
-                          {statusIcons[req.status]}
-                          {req.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCancelClick(req)}
-                        >
-                          <Ban className="mr-2 h-4 w-4" />
-                          Cancel
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                    return (
+                      <TableRow key={req.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarImage src={user.avatar} alt={user.name} />
+                              <AvatarFallback>{user.name[0]}</AvatarFallback>
+                            </Avatar>
+                            <span>{user.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{dept.name}</TableCell>
+                        <TableCell>{leaveType.name}</TableCell>
+                        <TableCell>
+                          {format(new Date(req.startDate), "MMM d, y")} -{" "}
+                          {format(new Date(req.endDate), "MMM d, y")}
+                        </TableCell>
+                        <TableCell>{req.days}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusColors[req.status]} className="flex items-center gap-1 w-fit">
+                            {statusIcons[req.status]}
+                            {req.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleCancelClick(req)}>
+                            <Ban className="mr-2 h-4 w-4" />
+                            Cancel
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow><TableCell colSpan={7} className="text-center">No leave requests found.</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -338,31 +340,15 @@ export default function DashboardPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action will cancel an approved or suspended leave request.
-              Please enter your password to confirm.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This action will cancel an approved or suspended leave request. Please enter your password to confirm.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
             <Label htmlFor="password">Admin Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-            />
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPassword("")}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmCancel}
-              disabled={!password}
-            >
-              Confirm
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setPassword("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCancel} disabled={!password}>Confirm</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

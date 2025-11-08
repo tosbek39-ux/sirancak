@@ -1,4 +1,4 @@
-import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabase'
+import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabaseClient'
 import type { User, Department, LeaveType, LeaveRequest, Notification, LogEntry } from '@/types'
 
 // Users service

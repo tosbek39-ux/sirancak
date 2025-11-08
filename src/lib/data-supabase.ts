@@ -47,14 +47,12 @@ export const getUsers = async (): Promise<User[]> => {
 
 // export const users: Promise<User[]> = getUsers()
 
-export const getUserById = async (id: string): Promise<User | undefined> => {
-  const users = await getUsers()
-  return users.find(user => user.id === id)
+export const getUserById = (id: string): User | undefined => {
+  return usersCache?.find(user => user.id === id)
 }
 
-export const getUserByNip = async (nip: string): Promise<User | undefined> => {
-  const users = await getUsers()
-  return users.find(user => user.nip === nip)
+export const getUserByNip = (nip: string): User | undefined => {
+  return usersCache?.find(user => user.nip === nip)
 }
 
 // ==============================
@@ -74,9 +72,8 @@ export const getDepartments = async (): Promise<Department[]> => {
 
 // export const departments: Promise<Department[]> = getDepartments()
 
-export const getDepartmentById = async (id: string): Promise<Department | undefined> => {
-  const departments = await getDepartments()
-  return departments.find(dep => dep.id === id)
+export const getDepartmentById = (id: string): Department | undefined => {
+  return departmentsCache?.find(dep => dep.id === id)
 }
 
 // ==============================
@@ -96,9 +93,8 @@ export const getLeaveTypes = async (): Promise<LeaveType[]> => {
 
 // export const leaveTypes: Promise<LeaveType[]> = getLeaveTypes()
 
-export const getLeaveTypeById = async (id: string): Promise<LeaveType | undefined> => {
-  const leaveTypes = await getLeaveTypes()
-  return leaveTypes.find(type => type.id === id)
+export const getLeaveTypeById = (id: string): LeaveType | undefined => {
+  return leaveTypesCache?.find(type => type.id === id)
 }
 
 // ==============================
@@ -231,6 +227,17 @@ export const logHistory = async (entry: LogEntry) => {
 // ==============================
 // 🔹 DATA MANIPULATION
 // ==============================
+export const updateUser = async (id: string, updates: Partial<User>): Promise<User> => {
+  try {
+    const updatedUser = await usersService.update(id, updates)
+    usersCache = null
+    return updatedUser
+  } catch (error) {
+    console.error('Failed to update user:', error)
+    throw error
+  }
+}
+
 export const createLeaveRequest = async (request: Omit<LeaveRequest, 'id' | 'createdAt'>): Promise<LeaveRequest> => {
   try {
     const newRequest = await leaveRequestsService.create({

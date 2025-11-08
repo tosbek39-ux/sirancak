@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Printer } from 'lucide-react';
-import { createClient } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 import {
   Card,
@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import type { LeaveRequest, User, LeaveType } from '@/types';
 
 export default function PrintPage() {
-  const supabase = createClient();
+  // const supabase = createClient(); // Use the exported instance
 
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);

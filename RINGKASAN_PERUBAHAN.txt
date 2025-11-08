@@ -1,0 +1,115 @@
+═══════════════════════════════════════════════════════════════════════════════
+RINGKASAN PERUBAHAN KODE - PERBAIKAN FITUR ADD USER & ADD DEPARTMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+📁 FILE YANG DIMODIFIKASI:
+─────────────────────────────────────────────────────────────────────────────
+
+1. src/supabase-service.ts
+   ├─ Baris 1: Memperbaiki import path
+   │  ❌ Sebelum: from './supabase'
+   │  ✅ Sesudah: from './lib/supabaseClient'
+   │
+   └─ Baris 173-233: Menambahkan 3 fungsi baru ke departmentsService
+      ✅ async create(department: { name: string }): Promise<Department>
+      ✅ async update(id: string, updates: Partial<Department>): Promise<Department>
+      ✅ async delete(id: string): Promise<boolean>
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔍 DETAIL PERUBAHAN:
+─────────────────────────────────────────────────────────────────────────────
+
+PERUBAHAN 1: Import Path
+─────────────────────────
+File: src/supabase-service.ts, Baris 1
+
+Alasan: File './supabase' tidak ada. File yang benar adalah './lib/supabaseClient'
+
+Kode Lama:
+  import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabase'
+
+Kode Baru:
+  import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './lib/supabaseClient'
+
+
+PERUBAHAN 2: Menambahkan Fungsi create() ke departmentsService
+────────────────────────────────────────────────────────────────
+File: src/supabase-service.ts, Baris 173-192
+
+Fungsi ini memungkinkan pembuatan department baru di database Supabase.
+
+Fitur:
+  - Membuat ID otomatis dari nama department (lowercase, spasi diganti dash)
+  - Menyimpan ke tabel 'departments' dengan employee_count default 0
+  - Mengembalikan object Department yang sudah disimpan
+
+Contoh Penggunaan:
+  const newDept = await departmentsService.create({ name: 'IT Department' })
+  // Hasil: { id: 'it-department', name: 'IT Department', employeeCount: 0 }
+
+
+PERUBAHAN 3: Menambahkan Fungsi update() ke departmentsService
+───────────────────────────────────────────────────────────────
+File: src/supabase-service.ts, Baris 194-217
+
+Fungsi ini memungkinkan pembaruan data department yang sudah ada.
+
+Fitur:
+  - Mengupdate nama atau employee_count
+  - Hanya mengupdate field yang diberikan (partial update)
+  - Mengembalikan object Department yang sudah diupdate
+
+Contoh Penggunaan:
+  const updated = await departmentsService.update('it', { name: 'Information Technology' })
+
+
+PERUBAHAN 4: Menambahkan Fungsi delete() ke departmentsService
+───────────────────────────────────────────────────────────────
+File: src/supabase-service.ts, Baris 219-233
+
+Fungsi ini memungkinkan penghapusan department dari database.
+
+Fitur:
+  - Menghapus department berdasarkan ID
+  - Mengembalikan true jika berhasil
+  - Throw error jika gagal
+
+Contoh Penggunaan:
+  const success = await departmentsService.delete('it')
+  // Hasil: true
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ FITUR YANG SEKARANG BERFUNGSI:
+─────────────────────────────────────────────────────────────────────────────
+
+1. Add Department (/admin/departments)
+   ✅ Menambah department baru
+   ✅ Mengedit nama department
+   ✅ Menghapus department (jika tidak ada karyawan)
+   ✅ Melihat jumlah karyawan per department
+
+2. Add User (/admin/users)
+   ✅ Menambah user baru dengan semua field
+   ✅ Mengedit informasi user
+   ✅ Menghapus user
+   ✅ Melihat daftar semua user dengan department mereka
+
+3. Penyimpanan Data
+   ✅ Data tersimpan ke Supabase database
+   ✅ Cache di-invalidate setelah operasi CRUD
+   ✅ Data ditampilkan dengan benar di UI
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 LANGKAH SELANJUTNYA:
+─────────────────────────────────────────────────────────────────────────────
+
+1. Pastikan Supabase sudah dikonfigurasi dengan benar di .env
+2. Jalankan database schema dari database-schema.sql
+3. Install dependencies: npm install
+4. Jalankan dev server: npm run dev
+5. Test fitur Add Department dan Add User di halaman admin
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -29,7 +29,7 @@ CREATE TABLE users (
   annual_leave_balance INTEGER DEFAULT 0,
   qr_code_signature TEXT,
   phone VARCHAR(50),
-  bangsa VARCHAR(50), -- Perbaikan typo: russe -> bangsa
+  golongan VARCHAR(50), -- Perbaikan typo: russe -> golongan
   join_date TIMESTAMP WITH TIME ZONE,
   address TEXT,
   password VARCHAR(255),
@@ -199,7 +199,7 @@ INSERT INTO app_settings (id, logo_url, company_name, letterhead, sick_leave_for
 );
 
 -- Insert sample users (tanpa foreign key constraint dulu karena users belum ada)
-INSERT INTO users (user_id, name, nip, avatar, department_id, role, annual_leave_balance, phone, bangsa, join_date, qr_code_signature, password) VALUES
+INSERT INTO users (user_id, name, nip, avatar, department_id, role, annual_leave_balance, phone, golongan, join_date, qr_code_signature, password) VALUES
 ('1', 'Budi Santoso', '199508172021011001', 'https://picsum.photos/seed/1/100/100', 'hr', 'Employee', 12, '6281234567890', 'III/a', '2021-01-15'::timestamp, '/qr-code-placeholder.png', 'password123'),
 ('2', 'Citra Lestari', '199205202019032002', 'https://picsum.photos/seed/2/100/100', 'it', 'Employee', 10, '6281234567891', 'III/d', '2019-03-01'::timestamp, '/qr-code-placeholder.png', 'password123'),
 ('3', 'Doni Firmansyah', '199811102022021003', 'https://picsum.photos/seed/3/100/100', 'finance', 'Employee', 5, '6281234567892', 'II/c', '2022-02-01'::timestamp, '/qr-code-placeholder.png', 'password123'),

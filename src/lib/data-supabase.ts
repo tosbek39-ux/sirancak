@@ -277,10 +277,16 @@ export const deleteUser = async (id: string): Promise<boolean> => {
 
 export const uploadFile = async (file: File, path: string): Promise<string> => {
   try {
-    // In a real app, this would upload to Supabase Storage and return the public URL
-    // For now, we return a placeholder URL
-    console.log(`Simulating file upload to: ${path}`)
-    return `https://sirancak.vercel.app/storage/v1/object/public/assets/${path}`
+    // Upload file to Supabase Storage
+    const { data, error } = await supabase.storage.from('assets').upload(path, file)
+
+    if (error) {
+      console.error('Supabase Storage Error:', error)
+      throw error
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('assets').getPublicUrl(data.path)
+    return publicUrlData.publicUrl
   } catch (error) {
     console.error('Failed to upload file:', error)
     throw error

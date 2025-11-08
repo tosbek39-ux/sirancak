@@ -1,9 +1,8 @@
-import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabase'
+import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './supabaseClient'
 import type { User, Department, LeaveType, LeaveRequest, Notification, LogEntry } from '@/types'
 
 // Users service
 export const usersService = {
-  // Get all users
   async getAll(): Promise<User[]> {
     const { data, error } = await supabase
       .from('users')
@@ -18,7 +17,6 @@ export const usersService = {
     return data?.map(convertUserFromDb) || []
   },
 
-  // Get user by ID
   async getById(id: string): Promise<User | null> {
     const { data, error } = await supabase
       .from('users')
@@ -34,7 +32,6 @@ export const usersService = {
     return data ? convertUserFromDb(data) : null
   },
 
-  // Get user by NIP
   async getByNip(nip: string): Promise<User | null> {
     const { data, error } = await supabase
       .from('users')
@@ -50,7 +47,6 @@ export const usersService = {
     return data ? convertUserFromDb(data) : null
   },
 
-  // Create new user
   async create(user: User): Promise<User> {
     const { data, error } = await supabase
       .from('users')
@@ -66,7 +62,6 @@ export const usersService = {
     return convertUserFromDb(data)
   },
 
-  // Update user
   async update(id: string, updates: Partial<User>): Promise<User> {
     const { data, error } = await supabase
       .from('users')
@@ -83,7 +78,6 @@ export const usersService = {
     return convertUserFromDb(data)
   },
 
-  // Delete user
   async delete(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('users')
@@ -98,7 +92,6 @@ export const usersService = {
     return true
   },
 
-  // Get users by department
   async getByDepartment(departmentId: string): Promise<User[]> {
     const { data, error } = await supabase
       .from('users')
@@ -114,7 +107,6 @@ export const usersService = {
     return data?.map(convertUserFromDb) || []
   },
 
-  // Get users by role
   async getByRole(role: 'Admin' | 'Employee'): Promise<User[]> {
     const { data, error } = await supabase
       .from('users')
@@ -131,9 +123,8 @@ export const usersService = {
   }
 }
 
-// Departments service
+// ✅ DEPARTMENTS SERVICE - LENGKAP DENGAN CREATE, UPDATE, DELETE
 export const departmentsService = {
-  // Get all departments
   async getAll(): Promise<Department[]> {
     const { data, error } = await supabase
       .from('departments')
@@ -152,7 +143,6 @@ export const departmentsService = {
     })) || []
   },
 
-  // Get department by ID
   async getById(id: string): Promise<Department | null> {
     const { data, error } = await supabase
       .from('departments')
@@ -170,12 +160,83 @@ export const departmentsService = {
       name: data.name,
       employeeCount: data.employee_count
     } : null
+  },
+
+  // ✅ CREATE DEPARTMENT
+  async create(department: { name: string }): Promise<Department> {
+    // Generate ID dari nama department
+    const id = department.name.toLowerCase().replace(/\s+/g, '-')
+    
+    const { data, error } = await supabase
+      .from('departments')
+      .insert({
+        id: id,
+        name: department.name,
+        employee_count: 0
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating department:', error)
+      throw error
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      employeeCount: data.employee_count
+    }
+  },
+
+  // ✅ UPDATE DEPARTMENT
+  async update(id: string, updates: Partial<Department>): Promise<Department> {
+    const updateData: any = {}
+    
+    if (updates.name !== undefined) {
+      updateData.name = updates.name
+    }
+    if (updates.employeeCount !== undefined) {
+      updateData.employee_count = updates.employeeCount
+    }
+
+    const { data, error } = await supabase
+      .from('departments')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating department:', error)
+      throw error
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      employeeCount: data.employee_count
+    }
+  },
+
+  // ✅ DELETE DEPARTMENT
+  async delete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('departments')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting department:', error)
+      throw error
+    }
+
+    return true
   }
 }
 
 // Leave types service
 export const leaveTypesService = {
-  // Get all leave types
   async getAll(): Promise<LeaveType[]> {
     const { data, error } = await supabase
       .from('leave_types')
@@ -193,7 +254,6 @@ export const leaveTypesService = {
     })) || []
   },
 
-  // Get leave type by ID
   async getById(id: string): Promise<LeaveType | null> {
     const { data, error } = await supabase
       .from('leave_types')
@@ -213,9 +273,8 @@ export const leaveTypesService = {
   }
 }
 
-// App settings service (logo, company info, theme)
+// App settings service
 export const appSettingsService = {
-  // Get app settings
   async getSettings() {
     const { data, error } = await supabase
       .from('app_settings')
@@ -247,7 +306,6 @@ export const appSettingsService = {
     }
   },
 
-  // Update app settings
   async updateSettings(settings: {
     logoUrl?: string
     companyName?: string
@@ -291,7 +349,6 @@ export const appSettingsService = {
 
 // Leave requests service
 export const leaveRequestsService = {
-  // Get all leave requests
   async getAll(): Promise<LeaveRequest[]> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -306,7 +363,6 @@ export const leaveRequestsService = {
     return data?.map(convertLeaveRequestFromDb) || []
   },
 
-  // Get leave request by ID
   async getById(id: string): Promise<LeaveRequest | null> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -322,7 +378,6 @@ export const leaveRequestsService = {
     return data ? convertLeaveRequestFromDb(data) : null
   },
 
-  // Get leave requests by user
   async getByUser(userId: string): Promise<LeaveRequest[]> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -338,7 +393,6 @@ export const leaveRequestsService = {
     return data?.map(convertLeaveRequestFromDb) || []
   },
 
-  // Get pending leave requests for approval
   async getPendingApprovals(approverId: string): Promise<LeaveRequest[]> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -355,7 +409,6 @@ export const leaveRequestsService = {
     return data?.map(convertLeaveRequestFromDb) || []
   },
 
-  // Create new leave request
   async create(request: LeaveRequest): Promise<LeaveRequest> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -371,7 +424,6 @@ export const leaveRequestsService = {
     return convertLeaveRequestFromDb(data)
   },
 
-  // Update leave request
   async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
     const { data, error } = await supabase
       .from('leave_requests')
@@ -388,7 +440,6 @@ export const leaveRequestsService = {
     return convertLeaveRequestFromDb(data)
   },
 
-  // Update leave request status
   async updateStatus(id: string, status: LeaveRequest['status'], nextApproverId?: string): Promise<LeaveRequest> {
     const updates: any = { status }
     if (nextApproverId !== undefined) {
@@ -410,7 +461,6 @@ export const leaveRequestsService = {
     return convertLeaveRequestFromDb(data)
   },
 
-  // Delete leave request
   async delete(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('leave_requests')
@@ -428,7 +478,6 @@ export const leaveRequestsService = {
 
 // Notifications service
 export const notificationsService = {
-  // Get all notifications
   async getAll(): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
@@ -451,7 +500,6 @@ export const notificationsService = {
     })) || []
   },
 
-  // Get notifications by user
   async getByUser(userId: string): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
@@ -475,7 +523,6 @@ export const notificationsService = {
     })) || []
   },
 
-  // Create notification
   async create(notification: Omit<Notification, 'id'>): Promise<Notification> {
     const { data, error } = await supabase
       .from('notifications')
@@ -505,7 +552,6 @@ export const notificationsService = {
     }
   },
 
-  // Mark notification as read
   async markAsRead(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('notifications')
@@ -520,7 +566,6 @@ export const notificationsService = {
     return true
   },
 
-  // Mark all notifications as read for user
   async markAllAsRead(userId: string): Promise<boolean> {
     const { error } = await supabase
       .from('notifications')
@@ -539,7 +584,6 @@ export const notificationsService = {
 
 // Log entries service
 export const logEntriesService = {
-  // Get all log entries
   async getAll(): Promise<LogEntry[]> {
     const { data, error } = await supabase
       .from('log_entries')
@@ -559,7 +603,6 @@ export const logEntriesService = {
     })) || []
   },
 
-  // Create log entry
   async create(logEntry: Omit<LogEntry, 'id'>): Promise<LogEntry> {
     const { data, error } = await supabase
       .from('log_entries')
@@ -585,18 +628,16 @@ export const logEntriesService = {
   }
 }
 
-// Department approval flows (you might want to store this in a separate table)
-// For now, keeping it as static data since it's configuration
+// Department approval flows
 export const departmentApprovalFlows: { [key: string]: string[] } = {
-  'hr': ['5', 'admin'], // Fitriani -> Admin
-  'it': ['2', 'admin'], // Citra -> Admin
-  'finance': ['7', 'admin'], // Hana -> Admin
-  'marketing': ['8', 'admin'], // Indra -> Admin
+  'hr': ['5', 'admin'],
+  'it': ['2', 'admin'],
+  'finance': ['7', 'admin'],
+  'marketing': ['8', 'admin']
 }
 
 // Real-time subscriptions
 export const subscriptions = {
-  // Subscribe to leave requests changes
   subscribeToLeaveRequests(callback: (payload: any) => void) {
     return supabase
       .channel('leave_requests')
@@ -607,7 +648,6 @@ export const subscriptions = {
       .subscribe()
   },
 
-  // Subscribe to notifications changes
   subscribeToNotifications(userId: string, callback: (payload: any) => void) {
     return supabase
       .channel(`notifications:${userId}`)

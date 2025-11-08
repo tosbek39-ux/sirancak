@@ -25,7 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MoreHorizontal, PlusCircle, QrCode, Trash2, UserPen, X } from 'lucide-react';
-import { getUsers, getDepartments, getDepartmentById } from '@/lib/data-supabase';
+import { getUsers, getDepartments, getDepartmentById, createUser, updateUser, deleteUser } from '@/lib/data-supabase';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ const updateDepartmentCount = (departmentId: string, amount: number) => {
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -65,12 +66,19 @@ export default function UsersPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [fetchedUsers, fetchedDepartments] = await Promise.all([
-        getUsers(),
-        getDepartments(),
-      ]);
-      setUsers(fetchedUsers);
-      setDepartments(fetchedDepartments);
+      setIsLoading(true);
+      try {
+        const [fetchedUsers, fetchedDepartments] = await Promise.all([
+          getUsers(),
+          getDepartments(),
+        ]);
+        setUsers(fetchedUsers || []);
+        setDepartments(fetchedDepartments || []);
+      } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to load initial data." });
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -115,48 +123,51 @@ export default function UsersPage() {
     setter({ ...target!, [field]: value });
   };
 
-  const handleAddUser = () => {
-    if (newUser.name && newUser.nip && newUser.departmentId && newUser.role && newUser.password) {
-      const user: User = {
-        id: `user-${Date.now()}`,
-        name: newUser.name,
-        nip: newUser.nip,
-        password: newUser.password,
-        avatar: `https://picsum.photos/seed/${Date.now()}/100/100`,
-        departmentId: newUser.departmentId,
-        role: newUser.role as User['role'],
-        annualLeaveBalance: Number(newUser.annualLeaveBalance),
-        qrCodeSignature: newUser.qrCodeSignature,
-        phone: newUser.phone,
-        golongan: newUser.golongan,
-        joinDate: newUser.joinDate
-      };
-      const updatedUsers = [...users, user];
-      setUsers(updatedUsers);
-      // In a real app, we would call an API to create the user.
-      // The local state is updated for the mock environment.
-
-      // Update department count
-      updateDepartmentCount(user.departmentId, 1);
-
-      setOpen(false);
-      setNewUser({
-        name: '',
-        nip: '',
-        password: '',
-        departmentId: '',
-        role: 'Employee',
-        annualLeaveBalance: 12,
-        qrCodeSignature: '',
-        phone: '',
-        golongan: '',
-        joinDate: new Date(),
-      });
-      toast({
-        title: 'User Added',
-        description: `${user.name} has been added successfully.`,
-      });
-    } else {
+	  const handleAddUser = async () => {
+	    if (newUser.name && newUser.nip && newUser.departmentId && newUser.role && newUser.password) {
+	      try {
+	        const user: User = {
+	          id: `user-${Date.now()}`,
+	          name: newUser.name,
+	          nip: newUser.nip,
+	          password: newUser.password,
+	          avatar: `https://picsum.photos/seed/${Date.now()}/100/100`,
+	          departmentId: newUser.departmentId,
+	          role: newUser.role as User['role'],
+	          annualLeaveBalance: Number(newUser.annualLeaveBalance),
+	          qrCodeSignature: newUser.qrCodeSignature,
+	          phone: newUser.phone,
+	          golongan: newUser.golongan,
+	          joinDate: newUser.joinDate
+	        };
+	        
+	        const createdUser = await createUser(user);
+	        setUsers([...users, createdUser]);
+	
+	        // Update department count (simulated or API call)
+	        updateDepartmentCount(createdUser.departmentId, 1);
+	
+	        setOpen(false);
+	      setNewUser({
+	        name: '',
+	        nip: '',
+	        password: '',
+	        departmentId: '',
+	        role: 'Employee',
+	        annualLeaveBalance: 12,
+	        qrCodeSignature: '',
+	        phone: '',
+	        golongan: '',
+	        joinDate: new Date(),
+	      });
+	      toast({
+	        title: 'User Added',
+	        description: `${user.name} has been added successfully.`,
+	      });
+	    } catch (error) {
+	      toast({ variant: "destructive", title: "Error", description: "Failed to add user." });
+	    }
+	  } else {
         toast({
             variant: 'destructive',
             title: 'Error',
@@ -170,47 +181,55 @@ export default function UsersPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateUser = () => {
-    if (editingUser) {
-      const originalUser = users.find(u => u.id === editingUser.id);
-
-      const updatedUsers = users.map(u => u.id === editingUser.id ? editingUser : u)
-      setUsers(updatedUsers);
-      // In a real app, we would call an API to update the user.
-      // The local state is updated for the mock environment.
-      
-      // Update department counts if department changed
-      if (originalUser && originalUser.departmentId !== editingUser.departmentId) {
-          updateDepartmentCount(originalUser.departmentId, -1);
-          updateDepartmentCount(editingUser.departmentId, 1);
-      }
-
-      setIsEditDialogOpen(false);
-      setEditingUser(null);
-      toast({
-        title: 'User Updated',
-        description: 'User information has been saved.',
-      });
-    }
-  };
+	  const handleUpdateUser = async () => {
+	    if (editingUser) {
+	      try {
+	        const originalUser = users.find(u => u.id === editingUser.id);
+	        
+	        const updatedUser = await updateUser(editingUser.id, editingUser);
+	        
+	        const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u)
+	        setUsers(updatedUsers);
+	        
+	        // Update department counts if department changed
+	        if (originalUser && originalUser.departmentId !== updatedUser.departmentId) {
+	            updateDepartmentCount(originalUser.departmentId, -1);
+	            updateDepartmentCount(updatedUser.departmentId, 1);
+	        }
+	
+	        setIsEditDialogOpen(false);
+	        setEditingUser(null);
+	        toast({
+	          title: 'User Updated',
+	          description: 'User information has been saved.',
+	        });
+	      } catch (error) {
+	        toast({ variant: "destructive", title: "Error", description: "Failed to update user." });
+	      }
+	    }
+	  };
   
-  const handleDeleteUser = (userId: string) => {
-    const userToDelete = users.find(u => u.id === userId);
-    if (!userToDelete) return;
-
-    const updatedUsers = users.filter(u => u.id !== userId);
-    setUsers(updatedUsers);
-    // In a real app, we would call an API to delete the user.
-    // The local state is updated for the mock environment.
-    
-    // Update department count
-    updateDepartmentCount(userToDelete.departmentId, -1);
-    
-    toast({
-      title: 'User Deleted',
-      description: 'The user has been removed.',
-    });
-  }
+	  const handleDeleteUser = async (userId: string) => {
+	    const userToDelete = users.find(u => u.id === userId);
+	    if (!userToDelete) return;
+	
+	    try {
+	      await deleteUser(userId);
+	      
+	      const updatedUsers = users.filter(u => u.id !== userId);
+	      setUsers(updatedUsers);
+	      
+	      // Update department count
+	      updateDepartmentCount(userToDelete.departmentId, -1);
+	      
+	      toast({
+	        title: 'User Deleted',
+	        description: 'The user has been removed.',
+	      });
+	    } catch (error) {
+	      toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
+	    }
+	  }
 
   const calculateMasaKerja = (joinDate?: Date): string => {
     if (!joinDate) return 'N/A';
@@ -224,8 +243,12 @@ export default function UsersPage() {
   }
 
 
-  return (
-    <div className="flex flex-col gap-6">
+	  if (isLoading) {
+	    return <p className="text-center py-10 text-muted-foreground">Memuat data pengguna...</p>;
+	  }
+	
+	  return (
+	    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-end">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>

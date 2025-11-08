@@ -227,6 +227,17 @@ export const logHistory = async (entry: LogEntry) => {
 // ==============================
 // 🔹 DATA MANIPULATION
 // ==============================
+export const createUser = async (user: User): Promise<User> => {
+  try {
+    const createdUser = await usersService.create(user)
+    usersCache = null
+    return createdUser
+  } catch (error) {
+    console.error('Failed to create user:', error)
+    throw error
+  }
+}
+
 export const updateUser = async (id: string, updates: Partial<User>): Promise<User> => {
   try {
     const updatedUser = await usersService.update(id, updates)
@@ -249,6 +260,64 @@ export const createLeaveRequest = async (request: Omit<LeaveRequest, 'id' | 'cre
     return newRequest
   } catch (error) {
     console.error('Failed to create leave request:', error)
+    throw error
+  }
+}
+
+export const deleteUser = async (id: string): Promise<boolean> => {
+  try {
+    const success = await usersService.delete(id)
+    usersCache = null
+    return success
+  } catch (error) {
+    console.error('Failed to delete user:', error)
+    throw error
+  }
+}
+
+export const uploadFile = async (file: File, path: string): Promise<string> => {
+  try {
+    // In a real app, this would upload to Supabase Storage and return the public URL
+    // For now, we return a placeholder URL
+    console.log(`Simulating file upload to: ${path}`)
+    return `https://sirancak.vercel.app/storage/v1/object/public/assets/${path}`
+  } catch (error) {
+    console.error('Failed to upload file:', error)
+    throw error
+  }
+}
+
+
+
+export const createDepartment = async (department: { name: string }): Promise<Department> => {
+  try {
+    const newDepartment = await departmentsService.create(department)
+    departmentsCache = null
+    return newDepartment
+  } catch (error) {
+    console.error('Failed to create department:', error)
+    throw error
+  }
+}
+
+export const updateDepartment = async (id: string, updates: Partial<Department>): Promise<Department> => {
+  try {
+    const updatedDepartment = await departmentsService.update(id, updates)
+    departmentsCache = null
+    return updatedDepartment
+  } catch (error) {
+    console.error('Failed to update department:', error)
+    throw error
+  }
+}
+
+export const deleteDepartment = async (id: string): Promise<boolean> => {
+  try {
+    const success = await departmentsService.delete(id)
+    departmentsCache = null
+    return success
+  } catch (error) {
+    console.error('Failed to delete department:', error)
     throw error
   }
 }

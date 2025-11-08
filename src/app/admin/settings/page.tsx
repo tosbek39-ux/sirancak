@@ -35,6 +35,8 @@ import {
   getDepartments,
   getUsers,
   getAppSettings,
+  updateAppSettings,
+  uploadFile, // Assuming a new function for file upload
   departmentApprovalFlows as staticApprovalFlows,
 } from '@/lib/data-supabase';
 
@@ -118,20 +120,51 @@ export default function SettingsPage() {
     });
   };
 
-  const handleBrandingSave = () => {
-    // ideally call updateAppSettings API here
-    toast({
-      title: 'Changes Saved!',
-      description: 'Branding updated locally.',
-    });
+  const handleBrandingSave = async () => {
+    try {
+      await updateAppSettings({
+        letterhead: letterhead,
+        // logoUrl is handled in handleLogoUpload
+      });
+      toast({
+        title: 'Changes Saved!',
+        description: 'Branding updated successfully.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: 'Failed to save branding settings.',
+      });
+    }
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setLogo(reader.result as string);
-    reader.readAsDataURL(file);
+
+    try {
+      // 1. Upload file to Supabase Storage
+      const path = `logos/${Date.now()}-${file.name}`;
+      const publicUrl = await uploadFile(file, path); // Assuming uploadFile handles the storage logic
+
+      // 2. Update local state and app settings
+      setLogo(publicUrl);
+      
+      await updateAppSettings({ logoUrl: publicUrl });
+
+      toast({
+        title: 'Logo Uploaded',
+        description: 'Logo has been successfully uploaded and saved.',
+      });
+    } catch (error) {
+      console.error('Logo upload failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: 'Failed to upload logo. Check console for details.',
+      });
+    }
   };
 
   const handleLetterheadChange = (index: number, value: string) => {

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import {
@@ -24,7 +24,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle, Trash2, Pen } from 'lucide-react';
-import { getDepartments, getUsers } from '@/lib/data-supabase';
+import { 
+    getDepartments, 
+    getUsers, 
+    createDepartment, 
+    updateDepartment, 
+    deleteDepartment 
+} from '@/lib/data-supabase';
 import {
   Dialog,
   DialogContent,
@@ -35,69 +41,70 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Department } from '@/types';
+import type { Department, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
-  const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
       const [fetchedDepartments, fetchedUsers] = await Promise.all([
         getDepartments(),
         getUsers(),
       ]);
-      setUsers(fetchedUsers);
       
-      // Recalculate employee counts
-      const departmentCounts = fetchedUsers.reduce((acc, user) => {
+      const usersData = fetchedUsers || [];
+      const departmentsData = fetchedDepartments || [];
+
+      const departmentCounts = usersData.reduce((acc, user) => {
           acc[user.departmentId] = (acc[user.departmentId] || 0) + 1;
           return acc;
       }, {} as { [key: string]: number });
 
-      const updatedDepartments = fetchedDepartments.map(dept => ({
+      const updatedDepartments = departmentsData.map(dept => ({
           ...dept,
           employeeCount: departmentCounts[dept.id] || 0,
       }));
+      
       setDepartments(updatedDepartments);
-    };
+      setUsers(usersData);
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to load department data.' });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
-  const handleAddDepartment = () => {
+  const handleAddDepartment = async () => {
     if (newDeptName) {
-      const newDepartment: Department = {
-        id: `dept-${Date.now()}`,
-        name: newDeptName,
-        employeeCount: 0,
-      };
-      const updatedDepartments = [...departments, newDepartment];
-      setDepartments(updatedDepartments);
-      // In a real app, this would be an API call to create the department.
-      // The local state is updated for the mock environment.
-      setOpen(false);
-      setNewDeptName('');
-      toast({
-        title: 'Department Added',
-        description: `${newDepartment.name} has been created.`,
-      });
-    } else {
+      try {
+        const newDepartment = await createDepartment({ name: newDeptName });
+        await fetchData(); // Refresh data
+        setIsAddDialogOpen(false);
+        setNewDeptName('');
         toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Department name is required.',
+          title: 'Department Added',
+          description: `${newDepartment.name} has been created.`,
         });
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to add department.' });
+      }
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Department name is required.' });
     }
   };
 
@@ -106,31 +113,30 @@ export default function DepartmentsPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateDepartment = () => {
+  const handleUpdateDepartment = async () => {
     if (editingDepartment) {
-      const updatedDepartments = departments.map(d => d.id === editingDepartment.id ? editingDepartment : d);
-      setDepartments(updatedDepartments);
-
-      // In a real app, this would be an API call to update the department.
-      // The local state is updated for the mock environment.
-
-      setIsEditDialogOpen(false);
-      setEditingDepartment(null);
-      toast({
-        title: 'Department Updated',
-        description: 'Changes have been saved successfully.',
-      });
+      try {
+        await updateDepartment(editingDepartment.id, { name: editingDepartment.name });
+        await fetchData(); // Refresh data
+        setIsEditDialogOpen(false);
+        setEditingDepartment(null);
+        toast({
+          title: 'Department Updated',
+          description: 'Changes have been saved successfully.',
+        });
+      } catch (error) {
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update department.' });
+      }
     }
   };
   
-  const handleDepartmentChange = (field: keyof Department, value: string) => {
+  const handleDepartmentNameChange = (value: string) => {
     if (editingDepartment) {
-      setEditingDepartment({ ...editingDepartment, [field]: value });
+      setEditingDepartment({ ...editingDepartment, name: value });
     }
   }
 
-  const handleDeleteDepartment = (departmentId: string) => {
-    // Check if any user is in this department
+  const handleDeleteDepartment = async (departmentId: string) => {
     const usersInDept = users.filter(u => u.departmentId === departmentId).length;
     if (usersInDept > 0) {
         toast({
@@ -141,27 +147,26 @@ export default function DepartmentsPage() {
         return;
     }
 
-    const updatedDepartments = departments.filter(d => d.id !== departmentId);
-    setDepartments(updatedDepartments);
-    
-    // In a real app, this would be an API call to delete the department.
-    // The local state is updated for the mock environment.
-    
-    toast({
-      title: 'Department Deleted',
-      description: 'The department has been removed.',
-    });
+    try {
+        await deleteDepartment(departmentId);
+        await fetchData(); // Refresh data
+        toast({
+          title: 'Department Deleted',
+          description: 'The department has been removed.',
+        });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete department.' });
+    }
   }
 
-
-  if (!isClient) {
-    return null;
+  if (isLoading) {
+    return <p className="text-center py-10 text-muted-foreground">Loading departments...</p>;
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Department
@@ -173,9 +178,7 @@ export default function DepartmentsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Name
-                </Label>
+                <Label htmlFor="name" className="text-right">Name</Label>
                 <Input id="name" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} className="col-span-3" />
               </div>
             </div>
@@ -189,9 +192,7 @@ export default function DepartmentsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Departments</CardTitle>
-          <CardDescription>
-            Organize your institution by creating and managing departments.
-          </CardDescription>
+          <CardDescription>Organize your institution by creating and managing departments.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -199,14 +200,11 @@ export default function DepartmentsPage() {
               <TableRow>
                 <TableHead>Department Name</TableHead>
                 <TableHead>Employees</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {departments.map((department) => {
-                return (
+              {departments.map((department) => (
                   <TableRow key={department.id}>
                     <TableCell className="font-medium">{department.name}</TableCell>
                     <TableCell>{department.employeeCount}</TableCell>
@@ -229,8 +227,7 @@ export default function DepartmentsPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -244,10 +241,8 @@ export default function DepartmentsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-name" className="text-right">
-                  Name
-                </Label>
-                <Input id="edit-name" value={editingDepartment.name} onChange={(e) => handleDepartmentChange('name', e.target.value)} className="col-span-3" />
+                <Label htmlFor="edit-name" className="text-right">Name</Label>
+                <Input id="edit-name" value={editingDepartment.name} onChange={(e) => handleDepartmentNameChange(e.target.value)} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>

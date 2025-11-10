@@ -1,6 +1,43 @@
 import { supabase, convertUserFromDb, convertLeaveRequestFromDb, convertUserToDb, convertLeaveRequestToDb } from './lib/supabaseClient'
 import type { User, Department, LeaveType, LeaveRequest, Notification, LogEntry } from '@/types'
 
+// ================================================================
+// LEAVE TYPE UUID HELPER FUNCTIONS - FIX UUID MISMATCH
+// ================================================================
+
+// Mapping dari kode string ke UUID database
+const leaveTypeCodeToUUID: { [key: string]: string } = {
+  'annual': 'aa111111-1111-1111-1111-111111111111',
+  'sick': 'aa222222-2222-2222-2222-222222222222', 
+  'emergency': 'aa333333-3333-3333-3333-333333333333',
+  'maternity': 'aa444444-4444-4444-4444-444444444444'
+};
+
+// Fungsi untuk convert kode leave type ke UUID
+function getLeaveTypeUUID(leaveCode: string): string {
+  const uuid = leaveTypeCodeToUUID[leaveCode];
+  if (!uuid) {
+    throw new Error(`Leave type code "${leaveCode}" not found. Valid codes: ${Object.keys(leaveTypeCodeToUUID).join(', ')}`);
+  }
+  return uuid;
+}
+
+// Fungsi untuk convert leave request data dengan auto UUID conversion
+function convertLeaveRequestToDbWithUUID(request: any) {
+  const dbData = convertLeaveRequestToDb(request);
+  
+  // Auto-convert leaveTypeId dari kode string ke UUID
+  if (dbData.leave_type_id && 
+      typeof dbData.leave_type_id === 'string' && 
+      ['annual', 'sick', 'emergency', 'maternity'].includes(dbData.leave_type_id)) {
+    
+    console.log(`Auto-converting leave type: ${dbData.leave_type_id} → ${getLeaveTypeUUID(dbData.leave_type_id)}`);
+    dbData.leave_type_id = getLeaveTypeUUID(dbData.leave_type_id);
+  }
+  
+  return dbData;
+}
+
 // Users service
 export const usersService = {
   // Get all users
@@ -414,37 +451,53 @@ export const leaveRequestsService = {
     return data?.map(convertLeaveRequestFromDb) || []
   },
 
-  // Create new leave request
+  // Create new leave request (FIXED dengan UUID auto-conversion)
   async create(request: LeaveRequest): Promise<LeaveRequest> {
-    const { data, error } = await supabase
-      .from('leave_requests')
-      .insert(convertLeaveRequestToDb(request))
-      .select()
-      .single()
+    try {
+      // Convert request dengan auto UUID conversion
+      const dbData = convertLeaveRequestToDbWithUUID(request);
+      
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .insert(dbData)
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Error creating leave request:', error)
-      throw error
+      if (error) {
+        console.error('Error creating leave request:', error)
+        throw error
+      }
+
+      return convertLeaveRequestFromDb(data)
+    } catch (error) {
+      console.error('Error in create leave request with UUID conversion:', error)
+      throw error;
     }
-
-    return convertLeaveRequestFromDb(data)
   },
 
-  // Update leave request
+  // Update leave request (FIXED dengan UUID auto-conversion)
   async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
-    const { data, error } = await supabase
-      .from('leave_requests')
-      .update(convertLeaveRequestToDb(updates))
-      .eq('request_id', id)
-      .select()
-      .single()
+    try {
+      // Convert updates dengan auto UUID conversion
+      const dbData = convertLeaveRequestToDbWithUUID(updates);
+      
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .update(dbData)
+        .eq('request_id', id)
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Error updating leave request:', error)
-      throw error
+      if (error) {
+        console.error('Error updating leave request:', error)
+        throw error
+      }
+
+      return convertLeaveRequestFromDb(data)
+    } catch (error) {
+      console.error('Error in update leave request with UUID conversion:', error)
+      throw error;
     }
-
-    return convertLeaveRequestFromDb(data)
   },
 
   // Update leave request status
